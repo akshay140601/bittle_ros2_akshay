@@ -7,6 +7,9 @@ import threading
 import time
 import cv2  # OpenCV library
 from rclpy.executors import MultiThreadedExecutor
+from skimage import color, data, restoration
+from scipy.signal import convolve2d
+import numpy as np
 
 # define a class for displaying the video feed
 
@@ -45,6 +48,24 @@ class ImageDisplay:
                 # If the queue emptied since checking, this exception will catch it
                 pass
 
+    def deblur(self, frame):
+        psf = np.ones((5, 5)) / 25
+        deconvolved_channels = []
+        for channel in range(frame.shape[2]):
+            channel_frame = frame[:, :, channel]
+
+            convolved_channel = convolve2d(channel_frame, psf, 'same')
+
+            convolved_channel += 0.1 * convolved_channel.std() * np.random.standard_normal(convolved_channel.shape)
+
+            deconvolved_channel = restoration.wiener(convolved_channel, psf, 1, clip=False)
+
+            deconvolved_channels.append(deconvolved_channel)
+
+        deconvolved = np.stack(deconvolved_channels, axis=2)
+
+        return deconvolved
+
 class ImageSubscriber(Node):
     def __init__(self):
         super().__init__('image_subscriber')
@@ -56,7 +77,8 @@ class ImageSubscriber(Node):
     def listener_callback(self, data):
         self.get_logger().info('Receiving video frame')
         current_frame = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='bgr8')
-        self.image_display.update_frame(current_frame)  # Update the frame to be displayed
+        deblurred_frame = self.image_display.deblur(current_frame)
+        self.image_display.update_frame(deblurred_frame)  # Update the frame to be displayed
 
 def main(args=None):
     rclpy.init(args=args)
