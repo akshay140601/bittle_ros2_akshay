@@ -77,7 +77,9 @@ class ImageSubscriber(Node):
     def listener_callback(self, data):
         self.get_logger().info('Receiving video frame')
         current_frame = self.bridge.compressed_imgmsg_to_cv2(data, desired_encoding='bgr8')
+        current_frame = np.array(current_frame)
         deblurred_frame = self.image_display.deblur(current_frame)
+        deblurred_frame = self.bridge.compressed_imgmsg_to_cv2(deblurred_frame, desired_encoding='bgr8')
         self.image_display.update_frame(deblurred_frame)  # Update the frame to be displayed
 
 def main(args=None):
